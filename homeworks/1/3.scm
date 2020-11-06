@@ -37,29 +37,39 @@
               (loop (- i 1) #f))))
     (loop (string-length expr) #t))
 
-  #|(define (number-starting-with-0?)
-    (define (loop i)
-      (if (= i (- (string-length expr) 1))
-          #f
-          (if (and (char=? (string-ref expr i) #\0) (char-numeric? (string-ref expr (+ i 1))) (not (char-numeric? (string-ref expr (- i 1)))))
-              #t
-              (loop (+ i 1)))))
-    (if (and (char=? (string-ref expr 0) #\0) (char-numeric? (string-ref expr 1)))
-        #t
-        (loop 1)))|#
+  (define (division-by-0?)
+    (define (loop i expr)
+      (cond ((= 0 (string-length expr)) #f)
+            ((= (+ i 1) (string-length expr)) #f)
+            ((and (char=? (string-ref expr i) #\/) (char=? (string-ref expr (+ i 1)) #\0)) #t)
+            (else (loop (+ i 1) expr))))
+          
+    (loop 0 (remove-whitespace-and-leading-0 expr)))
 
-  (if (= 0 (string-length (remove-whitespace expr)))
+  (if (= 0 (string-length (remove-whitespace-and-leading-0 expr)))
       #t
-      (and (all-chars-valid?) (correct-whitespaces?) (correct-operations?) #|(not (number-starting-with-0?))|#))); 001 is valid number? uncomment if not
+      (and (all-chars-valid?) (correct-whitespaces?) (correct-operations?) (not (division-by-0?)))))
 
-(define (remove-whitespace str)
-  (define (loop i cleared-str)
-    (if (= i (string-length str))
-        cleared-str
-        (if (char-whitespace? (string-ref str i))
-            (loop (+ i 1) cleared-str)
-            (loop (+ i 1) (string-append cleared-str (string (string-ref str i)))))))
-  (loop 0 ""))
+(define (remove-whitespace-and-leading-0 str)
+  (define (remove-whitespace str)
+    (define (loop i cleared-str)
+      (if (= i (string-length str))
+          cleared-str
+          (if (char-whitespace? (string-ref str i))
+              (loop (+ i 1) cleared-str)
+              (loop (+ i 1) (string-append cleared-str (string (string-ref str i)))))))
+    (loop 0 ""))
+
+  (define (remove-leading-0 str)
+    (define (loop i first-digit? cleared-str)
+      (cond ((= 0 (string-length str)) "")
+            ((= (+ i 1) (string-length str)) (string-append cleared-str (string (string-ref str i))))
+            ((char-operation? (string-ref str i)) (loop (+ i 1) #t (string-append cleared-str (string (string-ref str i)))))
+            ((and first-digit? (char=? (string-ref str i) #\0) (char-numeric? (string-ref str (+ i 1)))) (loop (+ i 1) #t cleared-str))
+            (else (loop (+ i 1) #f (string-append cleared-str (string (string-ref str i)))))))
+    (loop 0 #t ""))
+
+  (remove-leading-0 (remove-whitespace str)))
 
 (define (expr-rp expr)
   (define (first-char str)
@@ -74,7 +84,7 @@
 
   (define (operator-precedes? op1 op2)
     (cond ((char=? op1 #\^) #t
-           (if (char=? op2 #\^) #f #t))
+                            (if (char=? op2 #\^) #f #t))
           ((or (char=? op1 #\*) (char=? op1 #\/))
            (if (or (char=? op2 #\^) (char=? op2 #\*) (char=? op2 #\/)) #f #t))
           ((or (char=? op1 #\+) (char=? op1 #\-))
@@ -102,7 +112,7 @@
             (loop-precedence (string-ref expr i) reversed-polish-expr operators-stack))))
 
   (if (expr-valid? expr)
-      (loop 0 "" "" (remove-whitespace expr))
+      (loop 0 "" "" (remove-whitespace-and-leading-0 expr))
       #f))
 
 (define (expr-eval expr)
@@ -110,10 +120,10 @@
   (define (eval-op op-char op-to-exec expr)
 
     (define (char-part-of-number? c)
-        (if (or (char-numeric? c)
-                (and (char=? op-char #\+) (char=? c #\/))
-                (and (char=? op-char #\-) (char=? c #\/))
-                (and (char=? op-char #\*) (char=? c #\/))) #t #f))
+      (if (or (char-numeric? c)
+              (and (char=? op-char #\+) (char=? c #\/))
+              (and (char=? op-char #\-) (char=? c #\/))
+              (and (char=? op-char #\*) (char=? c #\/))) #t #f))
     
     (define (loop op? new-expr i left-number right-number)
 
@@ -151,13 +161,13 @@
     (loop #f "" 0 "" ""))
   
   (if (expr-valid? expr)
-      (if (= 0 (string-length (remove-whitespace expr)))
+      (if (= 0 (string-length (remove-whitespace-and-leading-0 expr)))
           0
           (string->number (eval-op #\- -
                                    (eval-op #\+ +
                                             (eval-op #\* *
                                                      (eval-op #\/ /
-                                                              (eval-op #\^ expt (remove-whitespace expr))))))))
+                                                              (eval-op #\^ expt (remove-whitespace-and-leading-0 expr))))))))
       #f))
 
 ; Examples
@@ -165,13 +175,16 @@
 (expr-valid? "0 +0  -0")
 (expr-valid? "+2+3+4+5")
 (expr-valid? "2+3+4+  05")
+(expr-valid? "20/2002")
+(expr-valid? "20/0*5")
 (expr-valid? "10   + 20"); → #t
 (expr-valid? "10 20 + 5"); → #f
 (expr-valid? "++++ 5"); → #f
 (expr-valid? "+++"); → #f
 
-(remove-whitespace "0 +0  -0")
-(remove-whitespace "10   + 20")
+(remove-whitespace-and-leading-0 "   012 +050+   0120")
+(remove-whitespace-and-leading-0 "0 +0  -0")
+(remove-whitespace-and-leading-0 "10   + 20")
 
 (expr-rp "10   + 20 -6^7*24/34325-0")
 (expr-rp "10^2+200-25/5/5")
@@ -180,7 +193,6 @@
 (expr-rp "1+6^34545^4*3/5-23/5*6+80^0")
 (expr-rp "1^6^5^4")
 
-(expr-valid? "")
 (expr-eval " 63/2/3 - 4*3+ 2^2^3^2  -8  ")
 (expr-eval " 63/2/3 - 5 - 1/2 - 3^2 -5")
 (expr-eval "10^2+200-25/5/5")
