@@ -15,6 +15,30 @@
 (define (compose f g)
   (lambda (x) (f (g x))))
 
+;;Задача 5
+(define (repeat n f)
+  (define (loop i rep)
+    (if (= i n)
+        rep
+        (loop (+ i 1) (compose rep f))))
+  (loop 0 (lambda (x) x)))
+
+;;Задача 6
+(define dx 1/100000)
+
+(define (derive f)
+  (lambda (x) (/ (- (f (+ x dx)) (f x)) dx)))
+
+;;Задача 7
+(define (derive-n n f)
+  (define (loop i der)
+    (if (= i n)
+        der
+        (loop (+ i 1) (derive der))))
+  (loop 0 f))
+
+;------------------------------------------------------
+
 (define (accumulate-p operation
                       transform
                       initial
@@ -114,4 +138,3 @@
                 (lambda (x) (< x 1))
                 )
   )
-
